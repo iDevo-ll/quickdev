@@ -4,199 +4,226 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
+
+	"nehonix-nhr/internal/process"
+	"nehonix-nhr/internal/types"
+	"nehonix-nhr/internal/utils"
+	"nehonix-nhr/internal/watcher"
 )
 
-// Check if a file exists
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
-}
+const Version = "1.0.0"
 
-// Find the project root (where package.json is)
-func findProjectRoot(startPath string) string {
-	currentPath := startPath
-	for {
-		if fileExists(filepath.Join(currentPath, "package.json")) {
-			return currentPath
-		}
-		parent := filepath.Dir(currentPath)
-		if parent == currentPath {
-			return startPath // If we can't find project root, return original path
-		}
-		currentPath = parent
-	}
-}
-
-// Check if package.json has type: module
-func isESMProject(projectRoot string) bool {
-	data, err := os.ReadFile(filepath.Join(projectRoot, "package.json"))
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(data), `"type": "module"`)
-}
-
-// Check for TypeScript configuration
-func getTypeScriptConfig(projectRoot string) map[string]string {
-	config := make(map[string]string)
-
-	// Check for tsconfig.json
-	tsconfigPath := filepath.Join(projectRoot, "tsconfig.json")
-	if fileExists(tsconfigPath) {
-		data, err := os.ReadFile(tsconfigPath)
-		if err == nil {
-			// Check for module type
-			if strings.Contains(string(data), `"module": "ES"`) || 
-			   strings.Contains(string(data), `"module": "ESNext"`) ||
-			   strings.Contains(string(data), `"module": "esnext"`) {
-				config["moduleType"] = "esm"
-			}
-		}
-	}
-
-	// Check for local installations
-	nodeModulesBin := filepath.Join(projectRoot, "node_modules", ".bin")
-	
-	if fileExists(filepath.Join(nodeModulesBin, "tsx")) {
-		config["runner"] = filepath.Join(nodeModulesBin, "tsx")
-	} else if fileExists(filepath.Join(nodeModulesBin, "ts-node")) {
-		config["runner"] = filepath.Join(nodeModulesBin, "ts-node")
-	}
-
-	return config
-}
+var (
+	scriptFlag            = flag.String("script", "", "Path to the script to run")
+	watchFlag            = flag.String("watch", ".", "Directories to watch (comma-separated)")
+	ignoreFlag           = flag.String("ignore", "node_modules,dist,.git", "Directories to ignore (comma-separated)")
+	extFlag             = flag.String("ext", ".js,.ts,.jsx,.tsx", "File extensions to watch (comma-separated)")
+	debounceFlag        = flag.Int("debounce", 250, "Debounce time in milliseconds")
+	restartDelayFlag    = flag.Int("restart-delay", 100, "Delay before restart in milliseconds")
+	maxRestartsFlag     = flag.Int("max-restarts", 0, "Maximum number of restarts (0 for unlimited)")
+	resetAfterFlag      = flag.Int("reset-after", 60000, "Reset restart count after X milliseconds")
+	gracefulFlag        = flag.Bool("graceful", true, "Use graceful shutdown")
+	gracefulTimeoutFlag = flag.Int("graceful-timeout", 5, "Graceful shutdown timeout in seconds")
+	pollingFlag         = flag.Bool("polling", false, "Use polling instead of filesystem events")
+	pollingIntervalFlag = flag.Int("polling-interval", 100, "Polling interval in milliseconds")
+	followSymlinksFlag  = flag.Bool("follow-symlinks", false, "Follow symlinks")
+	batchChangesFlag    = flag.Bool("batch", true, "Batch file changes")
+	batchTimeoutFlag    = flag.Int("batch-timeout", 300, "Batch timeout in milliseconds")
+	hashingFlag         = flag.Bool("hash", true, "Enable file hashing")
+	clearScreenFlag     = flag.Bool("clear", true, "Clear screen on restart")
+	ignoreFileFlag      = flag.String("ignore-file", "", "Custom ignore file")
+	watchDotFlag        = flag.Bool("watch-dot", false, "Watch dot files")
+	maxFileSizeFlag     = flag.Int("max-size", 10, "Maximum file size in MB")
+	excludeEmptyFlag    = flag.Bool("exclude-empty", true, "Exclude empty files")
+	parallelFlag        = flag.Bool("parallel", true, "Enable parallel processing")
+	healthCheckFlag     = flag.Bool("health", true, "Enable health checking")
+	healthIntervalFlag  = flag.Int("health-interval", 30, "Health check interval in seconds")
+	memoryLimitFlag     = flag.Int("memory", 500, "Memory limit in MB")
+)
 
 func main() {
-	// Parse command line arguments
-	scriptPath := flag.String("script", "", "Path to the script to run")
 	flag.Parse()
 
-	if *scriptPath == "" {
-		fmt.Println("Error: Please provide a script to run using -script flag")
+	if *scriptFlag == "" {
+		fmt.Println("Error: script path is required")
+		flag.Usage()
 		os.Exit(1)
 	}
 
-	// Convert to absolute path
-	absScriptPath, err := filepath.Abs(*scriptPath)
+	// Create configuration
+	config := &types.FileWatcherConfig{
+		Enabled:                true,
+		WatchPaths:            strings.Split(*watchFlag, ","),
+		IgnorePaths:           strings.Split(*ignoreFlag, ","),
+		Extensions:            strings.Split(*extFlag, ","),
+		DebounceMs:            *debounceFlag,
+		RestartDelay:          *restartDelayFlag,
+		MaxRestarts:           *maxRestartsFlag,
+		ResetRestartsAfter:    *resetAfterFlag,
+		GracefulShutdown:      *gracefulFlag,
+		GracefulShutdownTimeout: *gracefulTimeoutFlag,
+		UsePolling:            *pollingFlag,
+		PollingInterval:       *pollingIntervalFlag,
+		FollowSymlinks:        *followSymlinksFlag,
+		BatchChanges:          *batchChangesFlag,
+		BatchTimeout:          *batchTimeoutFlag,
+		EnableFileHashing:     *hashingFlag,
+		ClearScreen:           *clearScreenFlag,
+		CustomIgnoreFile:      *ignoreFileFlag,
+		WatchDotFiles:         *watchDotFlag,
+		MaxFileSize:           *maxFileSizeFlag,
+		ExcludeEmptyFiles:     *excludeEmptyFlag,
+		ParallelProcessing:    *parallelFlag,
+		HealthCheck:           *healthCheckFlag,
+		HealthCheckInterval:   *healthIntervalFlag,
+		MemoryLimit:           *memoryLimitFlag,
+	}
+
+	// Load custom ignore patterns if specified
+	if config.CustomIgnoreFile != "" {
+		if patterns, err := loadIgnoreFile(config.CustomIgnoreFile); err == nil {
+			config.IgnorePaths = append(config.IgnorePaths, patterns...)
+		}
+	}
+
+	// Create process manager
+	scriptPath, err := filepath.Abs(*scriptFlag)
 	if err != nil {
-		fmt.Printf("Error resolving path: %s\n", err)
+		fmt.Printf("Error resolving script path: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Find project root
-	projectRoot := findProjectRoot(filepath.Dir(absScriptPath))
-	fmt.Printf("📂 Project root: %s\n", projectRoot)
+	pm := process.NewProcessManager(scriptPath, config)
 
-	fmt.Println("🚀 Nehonix File Reloader (NHR) started")
-	fmt.Printf("👀 Watching: %s\n", *scriptPath)
+	// Create file watcher
+	fw := watcher.NewFileWatcher(config)
 
-	// Start the initial process
-	cmd := startProcess(absScriptPath, projectRoot)
-	
-	// Simple file watching using polling (for testing)
-	lastModTime := getFileModTime(*scriptPath)
-	
+	// Start the process
+	if err := pm.Start(); err != nil {
+		fmt.Printf("Error starting process: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Start the watcher
+	if err := fw.Start(); err != nil {
+		fmt.Printf("Error starting watcher: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Print initial status
+	printStatus(config)
+
+	// Main event loop
 	for {
-		time.Sleep(1 * time.Second)
-		currentModTime := getFileModTime(*scriptPath)
-		
-		if currentModTime != lastModTime {
-			fmt.Printf("📝 File changed: %s\n", *scriptPath)
-			
-			// Kill the existing process
-			if cmd != nil && cmd.Process != nil {
-				fmt.Println("🔄 Restarting process...")
-				cmd.Process.Kill()
-				cmd.Wait()
-			}
-			
-			// Start the new process
-			cmd = startProcess(absScriptPath, projectRoot)
-			lastModTime = currentModTime
+		select {
+		case event := <-fw.GetChangeChannel():
+			handleFileChange(event, pm)
+		case err := <-fw.GetErrorChannel():
+			fmt.Printf("Error: %v\n", err)
 		}
 	}
 }
 
-func startProcess(scriptPath, projectRoot string) *exec.Cmd {
-	var cmd *exec.Cmd
-
-	// Check file extension
-	ext := strings.ToLower(filepath.Ext(scriptPath))
-	switch ext {
-	case ".ts", ".tsx":
-		// Get TypeScript configuration
-		tsConfig := getTypeScriptConfig(projectRoot)
-		isESM := isESMProject(projectRoot) || tsConfig["moduleType"] == "esm"
-
-		// Determine runner and args based on configuration
-		if runner, exists := tsConfig["runner"]; exists {
-			// Use local installation
-			var args []string
-			if strings.HasSuffix(runner, "ts-node") {
-				args = []string{
-					"--transpile-only",
-				}
-				if isESM {
-					args = append(args, "--esm")
-				}
-				args = append(args, scriptPath)
-			} else if strings.HasSuffix(runner, "tsx") {
-				args = []string{scriptPath}
-			}
-			cmd = exec.Command(runner, args...)
-		} else {
-			// Use global installation or npx
-			if isESM {
-				cmd = exec.Command("npx", "--yes", "tsx", scriptPath)
-			} else {
-				cmd = exec.Command("npx", "--yes", "ts-node", "--transpile-only", scriptPath)
-			}
+func handleFileChange(event types.FileChangeEvent, pm *process.ProcessManager) {
+	var reason string
+	if event.IsDirectory {
+		reason = fmt.Sprintf("Directory changed: %s", utils.Path(event.RelativePath))
+	} else {
+		reason = fmt.Sprintf("File changed: %s", utils.Path(event.RelativePath))
+		if event.PreviousHash != "" {
+			reason += fmt.Sprintf(" (hash: %s -> %s)", 
+				utils.Dimmed(event.PreviousHash[:8]), 
+				utils.Info(event.Hash[:8]))
 		}
-
-		// Set working directory to project root for proper module resolution
-		cmd.Dir = projectRoot
-		
-		// Set NODE_ENV if not set
-		env := os.Environ()
-		hasNodeEnv := false
-		for _, e := range env {
-			if strings.HasPrefix(e, "NODE_ENV=") {
-				hasNodeEnv = true
-				break
-			}
-		}
-		if !hasNodeEnv {
-			env = append(env, "NODE_ENV=development")
-		}
-		cmd.Env = env
-
-	default:
-		// For JavaScript files, use node directly
-		cmd = exec.Command("node", scriptPath)
-		cmd.Dir = projectRoot
 	}
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	
-	err := cmd.Start()
-	if err != nil {
-		fmt.Printf("Error starting process: %s\n", err)
-		return nil
+	// Print change details
+	fmt.Printf("\n%s\n", utils.Info(reason))
+	if !event.IsDirectory {
+		fmt.Printf("%s %.2f KB\n", utils.Section("Size:"), float64(event.Size)/1024)
+		fmt.Printf("%s %s\n", utils.Section("Time:"), event.Timestamp.Format("15:04:05"))
 	}
-	
-	fmt.Printf("✨ Started process: %s\n", scriptPath)
-	return cmd
+
+	// Restart the process
+	if err := pm.Restart(reason); err != nil {
+		fmt.Printf("%s %v\n", utils.Error("Error restarting process:"), err)
+		return
+	}
+
+	// Print restart success
+	fmt.Printf("%s\n", utils.Success("Process restarted successfully"))
 }
 
-func getFileModTime(path string) time.Time {
-	info, err := os.Stat(path)
+func loadIgnoreFile(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return time.Time{}
+		return nil, fmt.Errorf("failed to read ignore file: %w", err)
 	}
-	return info.ModTime()
+
+	var patterns []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") {
+			// Convert glob patterns to proper format
+			line = strings.ReplaceAll(line, "\\", "/")
+			line = strings.TrimPrefix(line, "./")
+			patterns = append(patterns, line)
+		}
+	}
+
+	return patterns, nil
+}
+
+func printStatus(config *types.FileWatcherConfig) {
+	fmt.Printf("\n%s\n", utils.Header("Nehonix WatchTower"))
+	fmt.Println(utils.Dimmed("================================"))
+	
+	fmt.Printf("%s %s\n", utils.Section("Watching:"), utils.Path(strings.Join(config.WatchPaths, ", ")))
+	fmt.Printf("%s %s\n", utils.Section("Ignoring:"), utils.Path(strings.Join(config.IgnorePaths, ", ")))
+	fmt.Printf("%s %s\n", utils.Section("Extensions:"), utils.Path(strings.Join(config.Extensions, ", ")))
+	
+	features := getEnabledFeatures(config)
+	fmt.Printf("%s %s\n", utils.Section("Features:"), features)
+	
+	if config.MaxRestarts > 0 {
+		fmt.Printf("%s %d (reset after %ds)\n", 
+			utils.Section("Max Restarts:"),
+			config.MaxRestarts, 
+			config.ResetRestartsAfter/1000)
+	}
+	
+	if config.MemoryLimit > 0 {
+		fmt.Printf("%s %d MB\n", utils.Section("Memory Limit:"), config.MemoryLimit)
+	}
+	
+	fmt.Println(utils.Dimmed("================================"))
+	fmt.Printf("%s v%s\n", utils.Info("Monitoring with WatchTower"), Version)
+	fmt.Printf("%s\n\n", utils.Dimmed("Press Ctrl+C to exit"))
+}
+
+func getEnabledFeatures(config *types.FileWatcherConfig) string {
+	var features []string
+	
+	if config.BatchChanges {
+		features = append(features, "batching")
+	}
+	if config.EnableFileHashing {
+		features = append(features, "hashing")
+	}
+	if config.GracefulShutdown {
+		features = append(features, "graceful-shutdown")
+	}
+	if config.HealthCheck {
+		features = append(features, "health-monitoring")
+	}
+	if config.ParallelProcessing {
+		features = append(features, "parallel")
+	}
+	if config.UsePolling {
+		features = append(features, "polling")
+	}
+
+	return utils.Status(strings.Join(features, ", "))
 } 
