@@ -1,5 +1,71 @@
 {
+  "name": "watchtower",
+  "version": "1.0.0",
+  "description": "A professional-grade file watcher and development server for TypeScript/JavaScript applications, built with Go",
+  "author": "Nehonix",
+  "license": "MIT",
+  "homepage": "https://github.com/nehonix/watchtower#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nehonix/watchtower.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nehonix/watchtower/issues"
+  },
+  "keywords": [
+    "watchtower",
+    "file-watcher",
+    "development-server",
+    "typescript",
+    "javascript",
+    "hot-reload",
+    "live-reload",
+    "dev-server",
+    "development-tools",
+    "go",
+    "golang",
+    "cross-platform",
+    "monitoring",
+    "file-system",
+    "watch",
+    "nehonix"
+  ],
+  "bin": {
+    "watchtower": "./bin/watchtower.js"
+  },
+  "files": [
+    "bin/watchtower.js",
+    "scripts/install.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/install.js",
+    "build": "go build -o bin/watchtower ./internal",
+    "build:all": "node scripts/build-all.js",
+    "test": "go test ./...",
+    "lint": "golangci-lint run",
+    "clean": "rimraf bin/*"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
   "devDependencies": {
-    "@types/node": "^24.0.0"
+    "rimraf": "^5.0.5"
+  },
+  "dependencies": {
+    "binary-install": "^1.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

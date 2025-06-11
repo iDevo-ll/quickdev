@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"nehonix-nhr/internal/config"
 	"nehonix-nhr/internal/process"
 	"nehonix-nhr/internal/types"
 	"nehonix-nhr/internal/utils"
@@ -47,73 +48,107 @@ func main() {
 	flag.Parse()
 
 	if *scriptFlag == "" {
-		fmt.Println("Error: script path is required")
+		fmt.Println(utils.Error("Error: script path is required"))
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	// Create configuration
-	config := &types.FileWatcherConfig{
+	// Get absolute path of script
+	scriptPath, err := filepath.Abs(*scriptFlag)
+	if err != nil {
+		fmt.Printf("%s %v\n", utils.Error("Error resolving script path:"), err)
+		os.Exit(1)
+	}
+
+	// Find project root (directory containing package.json or parent of script)
+	projectRoot := findProjectRoot(scriptPath)
+
+	// Create initial config from CLI args
+	cliConfig := &types.FileWatcherConfig{
 		Enabled:                true,
 		WatchPaths:            strings.Split(*watchFlag, ","),
 		IgnorePaths:           strings.Split(*ignoreFlag, ","),
 		Extensions:            strings.Split(*extFlag, ","),
-		DebounceMs:            *debounceFlag,
-		RestartDelay:          *restartDelayFlag,
-		MaxRestarts:           *maxRestartsFlag,
-		ResetRestartsAfter:    *resetAfterFlag,
 		GracefulShutdown:      *gracefulFlag,
 		GracefulShutdownTimeout: *gracefulTimeoutFlag,
-		UsePolling:            *pollingFlag,
-		PollingInterval:       *pollingIntervalFlag,
-		FollowSymlinks:        *followSymlinksFlag,
+		MaxRestarts:           *maxRestartsFlag,
+		ResetRestartsAfter:    *resetAfterFlag,
+		RestartDelay:          *restartDelayFlag,
 		BatchChanges:          *batchChangesFlag,
 		BatchTimeout:          *batchTimeoutFlag,
 		EnableFileHashing:     *hashingFlag,
-		ClearScreen:           *clearScreenFlag,
-		CustomIgnoreFile:      *ignoreFileFlag,
+		UsePolling:            *pollingFlag,
+		PollingInterval:       *pollingIntervalFlag,
+		FollowSymlinks:        *followSymlinksFlag,
 		WatchDotFiles:         *watchDotFlag,
+		CustomIgnoreFile:      *ignoreFileFlag,
+		ParallelProcessing:    *parallelFlag,
+		MemoryLimit:           *memoryLimitFlag,
 		MaxFileSize:           *maxFileSizeFlag,
 		ExcludeEmptyFiles:     *excludeEmptyFlag,
-		ParallelProcessing:    *parallelFlag,
+		DebounceMs:            *debounceFlag,
 		HealthCheck:           *healthCheckFlag,
 		HealthCheckInterval:   *healthIntervalFlag,
-		MemoryLimit:           *memoryLimitFlag,
+		ClearScreen:           *clearScreenFlag,
 	}
 
-	// Load custom ignore patterns if specified
-	if config.CustomIgnoreFile != "" {
-		if patterns, err := loadIgnoreFile(config.CustomIgnoreFile); err == nil {
-			config.IgnorePaths = append(config.IgnorePaths, patterns...)
+	// Load and merge configuration from files
+	finalConfig, err := config.LoadConfig(cliConfig, projectRoot)
+	if err != nil {
+		fmt.Printf("%s %v\n", utils.Error("Error loading configuration:"), err)
+		os.Exit(1)
+	}
+
+	// Normalize paths to absolute
+	for i, path := range finalConfig.WatchPaths {
+		// Skip empty paths
+		if path == "" {
+			continue
+		}
+		
+		// Join with project root if path is relative
+		fullPath := path
+		if !filepath.IsAbs(path) {
+			fullPath = filepath.Join(projectRoot, path)
+		}
+		
+		// Convert to absolute path
+		absPath, err := filepath.Abs(fullPath)
+		if err == nil {
+			finalConfig.WatchPaths[i] = absPath
+			// fmt.Printf("Normalized watch path: %s -> %s\n", path, absPath)
+		} else {
+			fmt.Printf("Error normalizing path %s: %v\n", path, err)
 		}
 	}
 
-	// Create process manager
-	scriptPath, err := filepath.Abs(*scriptFlag)
-	if err != nil {
-		fmt.Printf("Error resolving script path: %v\n", err)
-		os.Exit(1)
-	}
+	// Print watch configuration
+	// fmt.Printf("\nWatch Configuration:\n")
+	// fmt.Printf("Project Root: %s\n", projectRoot)
+	// fmt.Printf("Watch Paths: %v\n", finalConfig.WatchPaths)
+	// fmt.Printf("Extensions: %v\n", finalConfig.Extensions)
+	// fmt.Printf("Ignore Paths: %v\n\n", finalConfig.IgnorePaths)
 
-	pm := process.NewProcessManager(scriptPath, config)
+	// Create process manager
+	pm := process.NewProcessManager(scriptPath, finalConfig)
 
 	// Create file watcher
-	fw := watcher.NewFileWatcher(config)
+	fw := watcher.NewFileWatcher(finalConfig)
 
-	// Start the process
-	if err := pm.Start(); err != nil {
-		fmt.Printf("Error starting process: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Start the watcher
+	// Start the watcher first
 	if err := fw.Start(); err != nil {
-		fmt.Printf("Error starting watcher: %v\n", err)
+		fmt.Printf("%s %v\n", utils.Error("Error starting watcher:"), err)
 		os.Exit(1)
 	}
 
 	// Print initial status
-	printStatus(config)
+	printStatus(finalConfig)
+
+	// Start the process
+	if err := pm.Start(); err != nil {
+		fmt.Printf("%s %v\n", utils.Error("Error starting process:"), err)
+		os.Exit(1)
+	}
 
 	// Main event loop
 	for {
@@ -121,33 +156,31 @@ func main() {
 		case event := <-fw.GetChangeChannel():
 			handleFileChange(event, pm)
 		case err := <-fw.GetErrorChannel():
-			fmt.Printf("Error: %v\n", err)
+			fmt.Printf("%s %v\n", utils.Error("Error:"), err)
 		}
 	}
 }
 
-func handleFileChange(event types.FileChangeEvent, pm *process.ProcessManager) {
-	var reason string
-	if event.IsDirectory {
-		reason = fmt.Sprintf("Directory changed: %s", utils.Path(event.RelativePath))
-	} else {
-		reason = fmt.Sprintf("File changed: %s", utils.Path(event.RelativePath))
-		if event.PreviousHash != "" {
-			reason += fmt.Sprintf(" (hash: %s -> %s)", 
-				utils.Dimmed(event.PreviousHash[:8]), 
-				utils.Info(event.Hash[:8]))
+// findProjectRoot looks for package.json to determine project root
+func findProjectRoot(scriptPath string) string {
+	dir := filepath.Dir(scriptPath)
+	for dir != "" && dir != "." && dir != "/" {
+		if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+			return dir
 		}
+		dir = filepath.Dir(dir)
 	}
+	return filepath.Dir(scriptPath)
+}
 
+func handleFileChange(event types.FileEvent, pm *process.ProcessManager) {
 	// Print change details
-	fmt.Printf("\n%s\n", utils.Info(reason))
-	if !event.IsDirectory {
-		fmt.Printf("%s %.2f KB\n", utils.Section("Size:"), float64(event.Size)/1024)
-		fmt.Printf("%s %s\n", utils.Section("Time:"), event.Timestamp.Format("15:04:05"))
-	}
+	fmt.Printf("\n%s %s\n", utils.Info("File changed:"), utils.Path(event.Path))
+	fmt.Printf("%s %s\n", utils.Section("Operation:"), event.Operation)
+	fmt.Printf("%s %s\n", utils.Section("Time:"), event.Time.Format("15:04:05"))
 
 	// Restart the process
-	if err := pm.Restart(reason); err != nil {
+	if err := pm.Restart(); err != nil {
 		fmt.Printf("%s %v\n", utils.Error("Error restarting process:"), err)
 		return
 	}
@@ -181,6 +214,8 @@ func printStatus(config *types.FileWatcherConfig) {
 	fmt.Println(utils.Dimmed("================================"))
 	
 	fmt.Printf("%s %s\n", utils.Section("Watching:"), utils.Path(strings.Join(config.WatchPaths, ", ")))
+	//print project github link
+	fmt.Printf("%s %s\n", utils.Section("Github:"), "https://github.com/nehonix/watchtower")
 	fmt.Printf("%s %s\n", utils.Section("Ignoring:"), utils.Path(strings.Join(config.IgnorePaths, ", ")))
 	fmt.Printf("%s %s\n", utils.Section("Extensions:"), utils.Path(strings.Join(config.Extensions, ", ")))
 	
@@ -224,6 +259,6 @@ func getEnabledFeatures(config *types.FileWatcherConfig) string {
 	if config.UsePolling {
 		features = append(features, "polling")
 	}
-
+	
 	return utils.Status(strings.Join(features, ", "))
 } 

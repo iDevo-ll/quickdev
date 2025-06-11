@@ -13,6 +13,7 @@ out/
 *.dll
 *.so
 *.dylib
+bin/
 
 # Environment files
 .env

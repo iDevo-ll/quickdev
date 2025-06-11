@@ -9,8 +9,8 @@ import (
 // FileWatcherConfig represents the configuration for the file watcher
 type FileWatcherConfig struct {
 	Enabled                bool          `json:"enabled"`
-	WatchPaths            []string      `json:"watchPaths"`
-	IgnorePaths           []string      `json:"ignorePaths"`
+	WatchPaths            []string      `json:"watch"`
+	IgnorePaths           []string      `json:"ignore"`
 	IgnorePatterns        []*regexp.Regexp `json:"ignorePatterns"`
 	Extensions            []string      `json:"extensions"`
 	DebounceMs            int           `json:"debounceMs"`
@@ -25,9 +25,9 @@ type FileWatcherConfig struct {
 	PersistentWatching    bool          `json:"persistentWatching"`
 	BatchChanges          bool          `json:"batchChanges"`
 	BatchTimeout          int           `json:"batchTimeout"`
-	EnableFileHashing     bool          `json:"enableFileHashing"`
+	EnableFileHashing     bool          `json:"enableHashing"`
 	ClearScreen           bool          `json:"clearScreen"`
-	CustomIgnoreFile      string        `json:"customIgnoreFile"`
+	CustomIgnoreFile      string        `json:"ignoreFile"`
 	WatchDotFiles         bool          `json:"watchDotFiles"`
 	MaxFileSize           int           `json:"maxFileSize"`
 	ExcludeEmptyFiles     bool          `json:"excludeEmptyFiles"`
@@ -35,6 +35,8 @@ type FileWatcherConfig struct {
 	HealthCheck           bool          `json:"healthCheck"`
 	HealthCheckInterval   int           `json:"healthCheckInterval"`
 	MemoryLimit           int           `json:"memoryLimit"`
+	TypeScriptRunner      string        `json:"typescriptRunner"` // "tsx" or "ts-node"
+	TSNodeFlags           string        `json:"tsNodeFlags"`      // Additional flags for ts-node/tsx
 }
 
 // FileChangeEvent represents a single file change event
@@ -59,26 +61,31 @@ type BatchChangeEvent struct {
 	Duration    time.Duration    `json:"duration"`
 }
 
-// RestartHistoryEntry represents a single restart event
-type RestartHistoryEntry struct {
-	Timestamp   time.Time `json:"timestamp"`
-	Reason      string    `json:"reason"`
-	Duration    time.Duration `json:"duration"`
-	Success     bool      `json:"success"`
-	FileCount   int       `json:"fileCount"`
-	MemoryUsage *MemoryUsage `json:"memoryUsage"`
+// FileEvent represents a file change event
+type FileEvent struct {
+	Path      string    `json:"path"`
+	Operation string    `json:"operation"`
+	Time      time.Time `json:"time"`
 }
 
-// RestartStats tracks statistics about process restarts
+// RestartHistoryEntry represents a single restart event
+type RestartHistoryEntry struct {
+	Time      time.Time     `json:"time"`
+	ExitCode  int          `json:"exitCode"`
+	Error     string       `json:"error"`
+	Duration  time.Duration `json:"duration"`
+}
+
+// RestartStats tracks process restart statistics
 type RestartStats struct {
-	TotalRestarts      int                  `json:"totalRestarts"`
-	LastRestart        *time.Time           `json:"lastRestart"`
-	AverageRestartTime time.Duration        `json:"averageRestartTime"`
-	FastestRestart     time.Duration        `json:"fastestRestart"`
-	SlowestRestart     time.Duration        `json:"slowestRestart"`
-	SuccessfulRestarts int                  `json:"successfulRestarts"`
-	FailedRestarts     int                  `json:"failedRestarts"`
-	RestartHistory     []RestartHistoryEntry `json:"restartHistory"`
+	TotalRestarts    int                   `json:"totalRestarts"`
+	LastRestart      time.Time             `json:"lastRestart"`
+	RestartHistory   []RestartHistoryEntry `json:"restartHistory"`
+	AverageUptime    time.Duration         `json:"averageUptime"`
+	LongestUptime    time.Duration         `json:"longestUptime"`
+	ShortestUptime   time.Duration         `json:"shortestUptime"`
+	LastExitCode     int                   `json:"lastExitCode"`
+	LastErrorMessage string                `json:"lastErrorMessage"`
 }
 
 // HealthError represents an error in the watcher's health monitoring
@@ -96,14 +103,17 @@ type MemoryUsage struct {
 	ProcessMemory uint64 `json:"processMemory"`
 }
 
-// WatcherHealth represents the health status of the file watcher
+// WatcherHealth represents health check information
 type WatcherHealth struct {
-	IsHealthy         bool          `json:"isHealthy"`
-	Uptime           time.Duration  `json:"uptime"`
-	MemoryUsage      *MemoryUsage  `json:"memoryUsage"`
-	ActiveConnections int           `json:"activeConnections"`
-	LastHealthCheck   time.Time     `json:"lastHealthCheck"`
-	Errors           []HealthError `json:"errors"`
+	LastCheck      time.Time `json:"lastCheck"`
+	Status         string    `json:"status"`
+	MemoryUsage    uint64    `json:"memoryUsage"`
+	CPUUsage       float64   `json:"cpuUsage"`
+	FileCount      int       `json:"fileCount"`
+	WatchedDirs    int       `json:"watchedDirs"`
+	ErrorCount     int       `json:"errorCount"`
+	LastError      string    `json:"lastError"`
+	LastErrorTime  time.Time `json:"lastErrorTime"`
 }
 
 // ConfigFile represents the watchtower.config.json structure
@@ -146,4 +156,4 @@ type ConfigFile struct {
 	// TypeScript specific
 	TypeScriptRunner string `json:"typescriptRunner"` // "tsx" or "ts-node"
 	TSNodeFlags      string `json:"tsNodeFlags"`      // Additional flags for ts-node
-} 
+}

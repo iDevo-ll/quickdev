@@ -1,6 +1,6 @@
 # Nehonix WatchTower
 
-A professional-grade file watcher and development server for TypeScript/JavaScript applications, built with Go. This tool is designed as a high-performance alternative to nodemon, specifically optimized for modern Node.js/TypeScript applications with advanced features not found in other reloaders.
+A professional-grade file watcher and development server for TypeScript/JavaScript applications. This tool is designed as a high-performance alternative to nodemon, specifically optimized for modern Node.js/TypeScript applications with advanced features not found in other reloaders.
 
 _Designed for fortify2-js server but can be used in other applications_
 
@@ -108,6 +108,53 @@ Create a `watchtower.config.json` (or `.watchtowerrc.json`) in your project root
 }
 ```
 
+### Configuration Options
+
+#### Core Settings
+
+- `script` - Path to the script to run (required)
+- `watch` - Directories to watch, array of paths
+- `ignore` - Directories to ignore, array of paths
+- `extensions` - File extensions to watch
+
+#### Process Management
+
+- `gracefulShutdown` - Enable graceful shutdown (default: true)
+- `gracefulShutdownTimeout` - Graceful shutdown timeout in seconds (default: 5)
+- `maxRestarts` - Maximum number of restarts (default: 5)
+- `resetRestartsAfter` - Reset restart count after X milliseconds (default: 60000)
+- `restartDelay` - Delay before restart in milliseconds (default: 100)
+
+#### File Watching
+
+- `batchChanges` - Enable batch processing of changes (default: true)
+- `batchTimeout` - Batch timeout in milliseconds (default: 300)
+- `enableHashing` - Enable file hashing for precise change detection (default: true)
+- `usePolling` - Use polling instead of filesystem events (default: false)
+- `pollingInterval` - Polling interval in milliseconds (default: 100)
+- `followSymlinks` - Follow symbolic links (default: false)
+- `watchDotFiles` - Watch dot files (default: false)
+- `ignoreFile` - Path to custom ignore file
+
+#### Performance
+
+- `parallelProcessing` - Enable parallel processing (default: true)
+- `memoryLimit` - Memory limit in MB (default: 500)
+- `maxFileSize` - Maximum file size in MB (default: 10)
+- `excludeEmptyFiles` - Exclude empty files (default: true)
+- `debounceMs` - Debounce time in milliseconds (default: 250)
+
+#### Monitoring
+
+- `healthCheck` - Enable health checking (default: true)
+- `healthCheckInterval` - Health check interval in seconds (default: 30)
+- `clearScreen` - Clear screen on restart (default: true)
+
+#### TypeScript Settings (leave blank to use default runner (recommanded))
+
+- `typescriptRunner` - TypeScript execution engine to use ("tsx" or "ts-node", default: tries "tsx" first, then "ts-node")
+- `tsNodeFlags` - Additional flags for the TypeScript runner (default: "--esm" for ts-node)
+
 ### 2. Ignore File
 
 Create a `.watchtowerignore` file to specify patterns to ignore:
@@ -145,6 +192,42 @@ WatchTower uses the following priority order when loading configuration:
 2. `watchtower.config.json` or `.watchtowerrc.json`
 3. `.watchtowerignore` file
 4. Default values (lowest priority)
+
+### TypeScript Support
+
+WatchTower provides robust TypeScript support with configurable execution options:
+
+#### TypeScript Runner Selection
+
+You can specify your preferred TypeScript runner in the config:
+
+```json
+{
+  "typescriptRunner": "tsx", // or "ts-node"
+  "tsNodeFlags": "--esm" // or any other flags you need
+}
+```
+
+The runner selection follows this order:
+
+1. Uses the specified `typescriptRunner` if configured
+2. Falls back to `tsx` if available
+3. Falls back to `ts-node` if available
+4. Fails if no TypeScript runner is found
+
+#### TypeScript Flags
+
+- For `tsx`: Pass any additional flags via `tsNodeFlags`
+- For `ts-node`: Default flags are `--esm`, can be overridden via `tsNodeFlags`
+
+Example with custom flags:
+
+```json
+{
+  "typescriptRunner": "ts-node",
+  "tsNodeFlags": "--esm --transpileOnly --compilerOptions '{\"module\":\"ESNext\"}'"
+}
+```
 
 ## Usage Examples
 

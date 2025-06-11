@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,84 +18,78 @@ const (
 	IgnoreFileName = ".watchtowerignore"
 )
 
-// LoadConfig loads configuration from various sources in order of precedence:
-// 1. Command line arguments
-// 2. watchtower.config.json or .watchtowerrc.json in project root
-// 3. Default values
+// LoadConfig loads and merges configuration from various sources
 func LoadConfig(cliConfig *types.FileWatcherConfig, projectRoot string) (*types.FileWatcherConfig, error) {
 	// Try to load config file
-	configFile, err := findAndLoadConfigFile(projectRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	// If no config file found, return CLI config
-	if configFile == nil {
-		return cliConfig, nil
+	fileConfig, err := loadConfigFile(projectRoot)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("error loading config file: %v", err)
 	}
 
 	// Merge configs with CLI taking precedence
-	config := mergeConfigs(configFile, cliConfig)
+	finalConfig := mergeConfigs(fileConfig, cliConfig)
 
-	// Load ignore patterns if specified
-	if config.CustomIgnoreFile != "" {
-		patterns, err := loadIgnoreFile(filepath.Join(projectRoot, config.CustomIgnoreFile))
+	// Load ignore patterns from .watchtowerignore
+	if patterns, err := loadIgnoreFile(finalConfig.CustomIgnoreFile, projectRoot); err == nil {
+		finalConfig.IgnorePaths = append(finalConfig.IgnorePaths, patterns...)
+	}
+
+	return finalConfig, nil
+}
+
+// loadConfigFile attempts to load configuration from watchtower.config.json or .watchtowerrc.json
+func loadConfigFile(projectRoot string) (*types.FileWatcherConfig, error) {
+	configFiles := []string{
+		filepath.Join(projectRoot, "watchtower.config.json"),
+		filepath.Join(projectRoot, ".watchtowerrc.json"),
+	}
+
+	var config types.FileWatcherConfig
+	var foundConfig bool
+
+	for _, configFile := range configFiles {
+		data, err := ioutil.ReadFile(configFile)
 		if err != nil {
-			return nil, fmt.Errorf("error loading ignore file: %w", err)
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
 		}
-		config.IgnorePaths = append(config.IgnorePaths, patterns...)
+
+		if err := json.Unmarshal(data, &config); err != nil {
+			return nil, fmt.Errorf("error parsing %s: %v", configFile, err)
+		}
+
+		foundConfig = true
+		break
 	}
 
-	return config, nil
-}
-
-// findAndLoadConfigFile looks for config files in the project root
-func findAndLoadConfigFile(projectRoot string) (*types.ConfigFile, error) {
-	// Try watchtower.config.json first
-	configPath := filepath.Join(projectRoot, ConfigFileName)
-	if _, err := os.Stat(configPath); err == nil {
-		return loadConfigFile(configPath)
-	}
-
-	// Try .watchtowerrc.json next
-	rcPath := filepath.Join(projectRoot, RCFileName)
-	if _, err := os.Stat(rcPath); err == nil {
-		return loadConfigFile(rcPath)
-	}
-
-	// No config file found, not an error
-	return nil, nil
-}
-
-// loadConfigFile loads and parses a config file
-func loadConfigFile(path string) (*types.ConfigFile, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("error reading config file: %w", err)
-	}
-
-	var config types.ConfigFile
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("error parsing config file: %w", err)
+	if !foundConfig {
+		return &types.FileWatcherConfig{}, nil
 	}
 
 	return &config, nil
 }
 
-// loadIgnoreFile loads patterns from a .watchtowerignore file
-func loadIgnoreFile(path string) ([]string, error) {
-	data, err := os.ReadFile(path)
+// loadIgnoreFile loads patterns from .watchtowerignore file
+func loadIgnoreFile(customIgnoreFile string, projectRoot string) ([]string, error) {
+	var ignoreFile string
+	if customIgnoreFile != "" {
+		ignoreFile = customIgnoreFile
+	} else {
+		ignoreFile = filepath.Join(projectRoot, ".watchtowerignore")
+	}
+
+	data, err := ioutil.ReadFile(ignoreFile)
 	if err != nil {
 		return nil, err
 	}
 
 	var patterns []string
-	for _, line := range strings.Split(string(data), "\n") {
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line != "" && !strings.HasPrefix(line, "#") {
-			// Convert glob patterns to proper format
-			line = strings.ReplaceAll(line, "\\", "/")
-			line = strings.TrimPrefix(line, "./")
 			patterns = append(patterns, line)
 		}
 	}
@@ -102,82 +97,87 @@ func loadIgnoreFile(path string) ([]string, error) {
 	return patterns, nil
 }
 
-// mergeConfigs merges CLI config with file config, CLI takes precedence
-func mergeConfigs(fileConfig *types.ConfigFile, cliConfig *types.FileWatcherConfig) *types.FileWatcherConfig {
-	config := &types.FileWatcherConfig{
-		// Core settings
-		Enabled:     true,
-		WatchPaths:  fileConfig.Watch,
-		IgnorePaths: fileConfig.Ignore,
-		Extensions:  fileConfig.Extensions,
+// mergeConfigs merges CLI config with file config, with CLI taking precedence
+func mergeConfigs(fileConfig, cliConfig *types.FileWatcherConfig) *types.FileWatcherConfig {
+	// Start with file config
+	result := *fileConfig
 
-		// Process Management
-		GracefulShutdown:        fileConfig.GracefulShutdown,
-		GracefulShutdownTimeout: fileConfig.GracefulShutdownTimeout,
-		MaxRestarts:             fileConfig.MaxRestarts,
-		ResetRestartsAfter:      fileConfig.ResetRestartsAfter,
-		RestartDelay:            fileConfig.RestartDelay,
+	// Override with CLI values if they're non-zero/non-empty
+	if len(cliConfig.WatchPaths) > 0 && cliConfig.WatchPaths[0] != "" {
+		result.WatchPaths = cliConfig.WatchPaths
+	}
+	if len(cliConfig.IgnorePaths) > 0 && cliConfig.IgnorePaths[0] != "" {
+		result.IgnorePaths = cliConfig.IgnorePaths
+	}
+	
+	// Special handling for extensions - merge instead of replace if CLI extensions are default
+	defaultExts := []string{".js", ".ts", ".jsx", ".tsx"}
+	isDefaultExtList := func(exts []string) bool {
+		if len(exts) != len(defaultExts) {
+			return false
+		}
+		for i, ext := range exts {
+			if ext != defaultExts[i] {
+				return false
+			}
+		}
+		return true
+	}
+	
+	// Only override extensions if CLI provided non-default extensions
+	if len(cliConfig.Extensions) > 0 && !isDefaultExtList(cliConfig.Extensions) {
+		result.Extensions = cliConfig.Extensions
+	} else if len(result.Extensions) == 0 {
+		// If no extensions in file config, use defaults
+		result.Extensions = defaultExts
+	}
+	// Otherwise keep the file config extensions
 
-		// File Watching
-		BatchChanges:    fileConfig.BatchChanges,
-		BatchTimeout:    fileConfig.BatchTimeout,
-		EnableFileHashing: fileConfig.EnableHashing,
-		UsePolling:      fileConfig.UsePolling,
-		PollingInterval: fileConfig.PollingInterval,
-		FollowSymlinks:  fileConfig.FollowSymlinks,
-		WatchDotFiles:   fileConfig.WatchDotFiles,
-		CustomIgnoreFile: fileConfig.IgnoreFile,
-
-		// Performance
-		ParallelProcessing: fileConfig.ParallelProcessing,
-		MemoryLimit:       fileConfig.MemoryLimit,
-		MaxFileSize:       fileConfig.MaxFileSize,
-		ExcludeEmptyFiles: fileConfig.ExcludeEmptyFiles,
-		DebounceMs:        fileConfig.DebounceMs,
-
-		// Monitoring
-		HealthCheck:         fileConfig.HealthCheck,
-		HealthCheckInterval: fileConfig.HealthCheckInterval,
-		ClearScreen:         fileConfig.ClearScreen,
+	if cliConfig.GracefulShutdownTimeout > 0 {
+		result.GracefulShutdownTimeout = cliConfig.GracefulShutdownTimeout
 	}
-
-	// Override with CLI values if provided
-	if cliConfig.WatchPaths != nil && len(cliConfig.WatchPaths) > 0 {
-		config.WatchPaths = cliConfig.WatchPaths
+	if cliConfig.MaxRestarts > 0 {
+		result.MaxRestarts = cliConfig.MaxRestarts
 	}
-	if cliConfig.IgnorePaths != nil && len(cliConfig.IgnorePaths) > 0 {
-		config.IgnorePaths = cliConfig.IgnorePaths
+	if cliConfig.ResetRestartsAfter > 0 {
+		result.ResetRestartsAfter = cliConfig.ResetRestartsAfter
 	}
-	if cliConfig.Extensions != nil && len(cliConfig.Extensions) > 0 {
-		config.Extensions = cliConfig.Extensions
+	if cliConfig.RestartDelay > 0 {
+		result.RestartDelay = cliConfig.RestartDelay
 	}
-	if cliConfig.MaxRestarts != 0 {
-		config.MaxRestarts = cliConfig.MaxRestarts
+	if cliConfig.BatchTimeout > 0 {
+		result.BatchTimeout = cliConfig.BatchTimeout
 	}
-	if cliConfig.ResetRestartsAfter != 0 {
-		config.ResetRestartsAfter = cliConfig.ResetRestartsAfter
+	if cliConfig.PollingInterval > 0 {
+		result.PollingInterval = cliConfig.PollingInterval
 	}
-	if cliConfig.RestartDelay != 0 {
-		config.RestartDelay = cliConfig.RestartDelay
+	if cliConfig.DebounceMs > 0 {
+		result.DebounceMs = cliConfig.DebounceMs
 	}
-	if cliConfig.BatchTimeout != 0 {
-		config.BatchTimeout = cliConfig.BatchTimeout
+	if cliConfig.MaxFileSize > 0 {
+		result.MaxFileSize = cliConfig.MaxFileSize
 	}
-	if cliConfig.PollingInterval != 0 {
-		config.PollingInterval = cliConfig.PollingInterval
+	if cliConfig.HealthCheckInterval > 0 {
+		result.HealthCheckInterval = cliConfig.HealthCheckInterval
 	}
-	if cliConfig.MemoryLimit != 0 {
-		config.MemoryLimit = cliConfig.MemoryLimit
+	if cliConfig.MemoryLimit > 0 {
+		result.MemoryLimit = cliConfig.MemoryLimit
 	}
-	if cliConfig.MaxFileSize != 0 {
-		config.MaxFileSize = cliConfig.MaxFileSize
-	}
-	if cliConfig.DebounceMs != 0 {
-		config.DebounceMs = cliConfig.DebounceMs
-	}
-	if cliConfig.HealthCheckInterval != 0 {
-		config.HealthCheckInterval = cliConfig.HealthCheckInterval
+	if cliConfig.CustomIgnoreFile != "" {
+		result.CustomIgnoreFile = cliConfig.CustomIgnoreFile
 	}
 
-	return config
+	// Boolean flags
+	result.GracefulShutdown = cliConfig.GracefulShutdown
+	result.BatchChanges = cliConfig.BatchChanges
+	result.EnableFileHashing = cliConfig.EnableFileHashing
+	result.UsePolling = cliConfig.UsePolling
+	result.FollowSymlinks = cliConfig.FollowSymlinks
+	result.WatchDotFiles = cliConfig.WatchDotFiles
+	result.ParallelProcessing = cliConfig.ParallelProcessing
+	result.ExcludeEmptyFiles = cliConfig.ExcludeEmptyFiles
+	result.HealthCheck = cliConfig.HealthCheck
+	result.ClearScreen = cliConfig.ClearScreen
+
+	return &result
 } 
