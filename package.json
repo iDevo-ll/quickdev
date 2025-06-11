@@ -1,9 +1,10 @@
 {
-  "name": "watchtower",
-  "version": "1.0.0",
+  "name": "dev-watchtower",
+  "version": "1.0.1",
   "description": "A professional-grade file watcher and development server for TypeScript/JavaScript applications, built with Go",
   "author": "Nehonix",
   "license": "MIT",
+  "publisher": "Seth Eleazar",
   "homepage": "https://github.com/nehonix/watchtower#readme",
   "repository": {
     "type": "git",
@@ -45,7 +46,8 @@
     "build:all": "node scripts/build-all.js",
     "test": "go test ./...",
     "lint": "golangci-lint run",
-    "clean": "rimraf bin/*"
+    "clean": "rimraf bin/*",
+    "prepublishOnly": "npm run build"
   },
   "engines": {
     "node": ">=14.0.0"
@@ -59,13 +61,16 @@
     "x64",
     "arm64"
   ],
-  "devDependencies": {
-    "rimraf": "^5.0.5"
-  },
   "dependencies": {
     "binary-install": "^1.1.0"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "rimraf": "^5.0.5"
   }
 }
