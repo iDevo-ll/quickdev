@@ -1,6 +1,6 @@
 {
   "name": "dev-watchtower",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A professional-grade file watcher and development server for TypeScript/JavaScript applications, built with Go",
   "author": "Nehonix",
   "license": "MIT",
