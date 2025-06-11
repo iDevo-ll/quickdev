@@ -1,0 +1,36 @@
+# Source code (we only publish binaries)
+internal/
+*.go
+go.mod
+go.sum
+
+# Development files
+test/
+test-watchtower/
+private/
+
+# Build artifacts we don't need (binaries will be downloaded from GitHub)
+bin/*.tar.gz
+bin/watchtower*
+bin/quickdev-*
+
+# Development tools
+scripts/build.bat
+scripts/build.ps1
+scripts/build-all.js
+
+# Git and IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

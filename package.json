@@ -1,76 +1,58 @@
 {
-  "name": "dev-watchtower",
-  "version": "1.0.3",
-  "description": "A professional-grade file watcher and development server for TypeScript/JavaScript applications, built with Go",
-  "author": "Nehonix",
-  "license": "MIT",
-  "publisher": "Seth Eleazar",
-  "homepage": "https://github.com/nehonix/watchtower#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/nehonix/watchtower.git"
+  "name": "nquickdev",
+  "version": "1.0.1",
+  "description": "A professional-grade file watcher and development server for TypeScript/JavaScript applications. High-performance alternative to nodemon.",
+  "main": "index.js",
+  "bin": {
+    "quickdev": "bin/quickdev.js"
   },
-  "bugs": {
-    "url": "https://github.com/nehonix/watchtower/issues"
+  "scripts": {
+    "postinstall": "node scripts/install.js",
+    "build": "node scripts/build-all.js",
+    "release": "node scripts/create-release.js",
+    "publish:dry": "node scripts/publish.js",
+    "publish:real": "node scripts/publish.js --publish",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "watchtower",
     "file-watcher",
     "development-server",
     "typescript",
     "javascript",
+    "nodemon",
     "hot-reload",
-    "live-reload",
     "dev-server",
-    "development-tools",
-    "go",
-    "golang",
-    "cross-platform",
-    "monitoring",
-    "file-system",
-    "watch",
+    "file-monitoring",
+    "process-manager",
     "nehonix"
   ],
-  "bin": {
-    "watchtower": "./bin/watchtower.js"
+  "author": "Nehonix",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nehonix/quickdev.git"
   },
-  "files": [
-    "bin/watchtower.js",
-    "scripts/install.js",
-    "README.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "postinstall": "node scripts/install.js",
-    "build": "go build -o bin/watchtower ./internal",
-    "build:all": "node scripts/build-all.js",
-    "test": "go test ./...",
-    "lint": "golangci-lint run",
-    "clean": "rimraf bin/*",
-    "prepublishOnly": "npm run build"
+  "bugs": {
+    "url": "https://github.com/nehonix/quickdev/issues"
   },
+  "homepage": "https://github.com/nehonix/quickdev#readme",
   "engines": {
     "node": ">=14.0.0"
   },
   "os": [
+    "win32",
     "darwin",
-    "linux",
-    "win32"
+    "linux"
   ],
   "cpu": [
     "x64",
     "arm64"
   ],
-  "dependencies": {
-    "binary-install": "^1.1.0"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "devDependencies": {
-    "@types/node": "^20.11.24",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3",
-    "rimraf": "^5.0.5"
-  }
+  "files": [
+    "bin/quickdev.js",
+    "scripts/install.js",
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ]
 }

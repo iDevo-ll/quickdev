@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"nehonix-nhr/internal/types"
+	"quickdev/internal/types"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -375,4 +375,4 @@ func (fw *FileWatcher) GetChangeChannel() <-chan types.FileEvent {
 // GetErrorChannel returns the channel for errors
 func (fw *FileWatcher) GetErrorChannel() <-chan error {
 	return fw.errors
-} 
+}

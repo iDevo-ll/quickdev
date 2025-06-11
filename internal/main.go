@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"nehonix-nhr/internal/config"
-	"nehonix-nhr/internal/process"
-	"nehonix-nhr/internal/types"
-	"nehonix-nhr/internal/utils"
-	"nehonix-nhr/internal/watcher"
+	"quickdev/internal/config"
+	"quickdev/internal/process"
+	"quickdev/internal/types"
+	"quickdev/internal/utils"
+	"quickdev/internal/watcher"
 )
 
 const Version = "1.0.0"
@@ -105,13 +105,13 @@ func main() {
 		if path == "" {
 			continue
 		}
-		
+
 		// Join with project root if path is relative
 		fullPath := path
 		if !filepath.IsAbs(path) {
 			fullPath = filepath.Join(projectRoot, path)
 		}
-		
+
 		// Convert to absolute path
 		absPath, err := filepath.Abs(fullPath)
 		if err == nil {
@@ -210,37 +210,37 @@ func loadIgnoreFile(path string) ([]string, error) {
 }
 
 func printStatus(config *types.FileWatcherConfig) {
-	fmt.Printf("\n%s\n", utils.Header("Nehonix WatchTower"))
+	fmt.Printf("\n%s\n", utils.Header("Nehonix quickdev"))
 	fmt.Println(utils.Dimmed("================================"))
-	
+
 	fmt.Printf("%s %s\n", utils.Section("Watching:"), utils.Path(strings.Join(config.WatchPaths, ", ")))
 	//print project github link
-	fmt.Printf("%s %s\n", utils.Section("Github:"), "https://github.com/nehonix/watchtower")
+	fmt.Printf("%s %s\n", utils.Section("Github:"), "https://github.com/nehonix/quickdev")
 	fmt.Printf("%s %s\n", utils.Section("Ignoring:"), utils.Path(strings.Join(config.IgnorePaths, ", ")))
 	fmt.Printf("%s %s\n", utils.Section("Extensions:"), utils.Path(strings.Join(config.Extensions, ", ")))
-	
+
 	features := getEnabledFeatures(config)
 	fmt.Printf("%s %s\n", utils.Section("Features:"), features)
-	
+
 	if config.MaxRestarts > 0 {
-		fmt.Printf("%s %d (reset after %ds)\n", 
+		fmt.Printf("%s %d (reset after %ds)\n",
 			utils.Section("Max Restarts:"),
-			config.MaxRestarts, 
+			config.MaxRestarts,
 			config.ResetRestartsAfter/1000)
 	}
-	
+
 	if config.MemoryLimit > 0 {
 		fmt.Printf("%s %d MB\n", utils.Section("Memory Limit:"), config.MemoryLimit)
 	}
-	
+
 	fmt.Println(utils.Dimmed("================================"))
-	fmt.Printf("%s v%s\n", utils.Info("Monitoring with WatchTower"), Version)
+	fmt.Printf("%s v%s\n", utils.Info("Monitoring with quickdev"), Version)
 	fmt.Printf("%s\n\n", utils.Dimmed("Press Ctrl+C to exit"))
 }
 
 func getEnabledFeatures(config *types.FileWatcherConfig) string {
 	var features []string
-	
+
 	if config.BatchChanges {
 		features = append(features, "batching")
 	}
@@ -259,6 +259,6 @@ func getEnabledFeatures(config *types.FileWatcherConfig) string {
 	if config.UsePolling {
 		features = append(features, "polling")
 	}
-	
+
 	return utils.Status(strings.Join(features, ", "))
-} 
+}

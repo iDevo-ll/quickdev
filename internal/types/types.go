@@ -116,7 +116,7 @@ type WatcherHealth struct {
 	LastErrorTime  time.Time `json:"lastErrorTime"`
 }
 
-// ConfigFile represents the watchtower.config.json structure
+// ConfigFile represents the quickdev.config.json structure
 type ConfigFile struct {
 	// Core settings
 	Script     string   `json:"script"`

@@ -1,4 +1,4 @@
-module nehonix-nhr
+module quickdev
 
 go 1.21
 

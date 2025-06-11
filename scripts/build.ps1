@@ -1,4 +1,4 @@
-# Build script for Nehonix WatchTower
+# Build script for Nehonix quickdev
 param (
     [string]$Version = "1.0.0",
     [string]$BuildType = "release",
@@ -8,13 +8,13 @@ param (
 # Script variables
 $ErrorActionPreference = "Stop"
 $BuildDir = "dist"
-$BinaryName = "watchtower"
+$BinaryName = "quickdev"
 if ($IsWindows) {
     $BinaryName += ".exe"
 }
 
 # Print build info
-Write-Host "`nBuilding Nehonix WatchTower" -ForegroundColor Cyan
+Write-Host "`nBuilding Nehonix quickdev" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
 Write-Host "Version: $Version"
 Write-Host "Build Type: $BuildType"

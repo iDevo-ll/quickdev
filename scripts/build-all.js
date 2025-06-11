@@ -58,7 +58,7 @@ function createTarArchive(outputName, outputPath, tarPath) {
 // Build for each platform
 platforms.forEach((platform) => {
   const { GOOS, GOARCH, suffix } = platform;
-  const outputName = `watchtower-${GOOS}-${GOARCH}${suffix}`;
+  const outputName = `quickdev-${GOOS}-${GOARCH}${suffix}`;
   const outputPath = path.join(binDir, outputName);
 
   console.log(`Building for ${GOOS} ${GOARCH}...`);
@@ -76,7 +76,7 @@ platforms.forEach((platform) => {
     });
 
     // Create tar.gz archive
-    const tarName = `watchtower-${GOOS}-${GOARCH}.tar.gz`;
+    const tarName = `quickdev-${GOOS}-${GOARCH}.tar.gz`;
     const tarPath = path.join(binDir, tarName);
 
     // Set file permissions (Windows doesn't need chmod)

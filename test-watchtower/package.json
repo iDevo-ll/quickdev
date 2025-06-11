@@ -1,9 +1,10 @@
 {
-  "name": "test-watchtower",
+  "name": "test-quickdev",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "quickdev -script src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -16,6 +17,6 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "dev-watchtower": "^1.0.2"
+    "nquickdev": "^1.0.0"
   }
 }

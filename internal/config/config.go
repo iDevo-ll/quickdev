@@ -8,14 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"nehonix-nhr/internal/types"
+	"quickdev/internal/types"
 )
 
 // Default config file names
 const (
-	ConfigFileName = "watchtower.config.json"
-	RCFileName    = ".watchtowerrc.json"
-	IgnoreFileName = ".watchtowerignore"
+	ConfigFileName = "quickdev.config.json"
+	RCFileName    = ".quickdevrc.json"
+	IgnoreFileName = ".quickdevignore"
 )
 
 // LoadConfig loads and merges configuration from various sources
@@ -29,7 +29,7 @@ func LoadConfig(cliConfig *types.FileWatcherConfig, projectRoot string) (*types.
 	// Merge configs with CLI taking precedence
 	finalConfig := mergeConfigs(fileConfig, cliConfig)
 
-	// Load ignore patterns from .watchtowerignore
+	// Load ignore patterns from .quickdevignore
 	if patterns, err := loadIgnoreFile(finalConfig.CustomIgnoreFile, projectRoot); err == nil {
 		finalConfig.IgnorePaths = append(finalConfig.IgnorePaths, patterns...)
 	}
@@ -37,11 +37,11 @@ func LoadConfig(cliConfig *types.FileWatcherConfig, projectRoot string) (*types.
 	return finalConfig, nil
 }
 
-// loadConfigFile attempts to load configuration from watchtower.config.json or .watchtowerrc.json
+// loadConfigFile attempts to load configuration from quickdev.config.json or .quickdevrc.json
 func loadConfigFile(projectRoot string) (*types.FileWatcherConfig, error) {
 	configFiles := []string{
-		filepath.Join(projectRoot, "watchtower.config.json"),
-		filepath.Join(projectRoot, ".watchtowerrc.json"),
+		filepath.Join(projectRoot, "quickdev.config.json"),
+		filepath.Join(projectRoot, ".quickdevrc.json"),
 	}
 
 	var config types.FileWatcherConfig
@@ -71,13 +71,13 @@ func loadConfigFile(projectRoot string) (*types.FileWatcherConfig, error) {
 	return &config, nil
 }
 
-// loadIgnoreFile loads patterns from .watchtowerignore file
+// loadIgnoreFile loads patterns from .quickdevignore file
 func loadIgnoreFile(customIgnoreFile string, projectRoot string) ([]string, error) {
 	var ignoreFile string
 	if customIgnoreFile != "" {
 		ignoreFile = customIgnoreFile
 	} else {
-		ignoreFile = filepath.Join(projectRoot, ".watchtowerignore")
+		ignoreFile = filepath.Join(projectRoot, ".quickdevignore")
 	}
 
 	data, err := ioutil.ReadFile(ignoreFile)
@@ -109,7 +109,7 @@ func mergeConfigs(fileConfig, cliConfig *types.FileWatcherConfig) *types.FileWat
 	if len(cliConfig.IgnorePaths) > 0 && cliConfig.IgnorePaths[0] != "" {
 		result.IgnorePaths = cliConfig.IgnorePaths
 	}
-	
+
 	// Special handling for extensions - merge instead of replace if CLI extensions are default
 	defaultExts := []string{".js", ".ts", ".jsx", ".tsx"}
 	isDefaultExtList := func(exts []string) bool {
@@ -123,7 +123,7 @@ func mergeConfigs(fileConfig, cliConfig *types.FileWatcherConfig) *types.FileWat
 		}
 		return true
 	}
-	
+
 	// Only override extensions if CLI provided non-default extensions
 	if len(cliConfig.Extensions) > 0 && !isDefaultExtList(cliConfig.Extensions) {
 		result.Extensions = cliConfig.Extensions
@@ -180,4 +180,4 @@ func mergeConfigs(fileConfig, cliConfig *types.FileWatcherConfig) *types.FileWat
 	result.ClearScreen = cliConfig.ClearScreen
 
 	return &result
-} 
+}

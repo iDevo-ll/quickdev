@@ -1,4 +1,4 @@
-# Nehonix WatchTower
+# Nehonix QuickDev
 
 A professional-grade file watcher and development server for TypeScript/JavaScript applications. This tool is designed as a high-performance alternative to nodemon, specifically optimized for modern Node.js/TypeScript applications with advanced features not found in other reloaders.
 
@@ -51,25 +51,31 @@ _Designed for fortify2-js server but can be used in other applications_
 
 ## Installation
 
+### Option 1: Install via npm (Recommended)
+```bash
+npm install -g nquickdev
+```
+
+### Option 2: Install via Go
 1. Make sure you have Go installed (version 1.21 or higher)
 2. Install using Go:
    ```bash
-   go install github.com/nehonix/watchtower@latest
+   go install github.com/nehonix/quickdev@latest
    ```
    Or build from source:
    ```bash
-   git clone https://github.com/nehonix/watchtower.git
-   cd watchtower
-   go build -o watchtower
+   git clone https://github.com/nehonix/quickdev.git
+   cd quickdev
+   go build -o quickdev
    ```
 
 ## Configuration
 
-WatchTower supports multiple ways to configure its behavior:
+quickdev supports multiple ways to configure its behavior:
 
 ### 1. Configuration File
 
-Create a `watchtower.config.json` (or `.watchtowerrc.json`) in your project root:
+Create a `quickdev.config.json` (or `.quickdevrc.json`) in your project root:
 
 ```json
 {
@@ -91,7 +97,7 @@ Create a `watchtower.config.json` (or `.watchtowerrc.json`) in your project root
   "pollingInterval": 100,
   "followSymlinks": false,
   "watchDotFiles": false,
-  "ignoreFile": ".watchtowerignore",
+  "ignoreFile": ".quickdevignore",
 
   "parallelProcessing": true,
   "memoryLimit": 500,
@@ -157,7 +163,7 @@ Create a `watchtower.config.json` (or `.watchtowerrc.json`) in your project root
 
 ### 2. Ignore File
 
-Create a `.watchtowerignore` file to specify patterns to ignore:
+Create a `.quickdevignore` file to specify patterns to ignore:
 
 ```text
 # Comments are supported
@@ -176,7 +182,7 @@ build/
 All configuration options can be overridden via command line arguments:
 
 ```bash
-watchtower -script server.js \
+quickdev -script server.js \
   --watch="src,config" \
   --ignore="node_modules,dist" \
   --ext=".ts,.js"
@@ -186,16 +192,16 @@ Command line arguments take precedence over configuration file settings.
 
 ### Configuration Priority
 
-WatchTower uses the following priority order when loading configuration:
+quickdev uses the following priority order when loading configuration:
 
 1. Command line arguments (highest priority)
-2. `watchtower.config.json` or `.watchtowerrc.json`
-3. `.watchtowerignore` file
+2. `quickdev.config.json` or `.quickdevrc.json`
+3. `.quickdevignore` file
 4. Default values (lowest priority)
 
 ### TypeScript Support
 
-WatchTower provides robust TypeScript support with configurable execution options:
+quickdev provides robust TypeScript support with configurable execution options:
 
 #### TypeScript Runner Selection
 
@@ -234,13 +240,13 @@ Example with custom flags:
 ### Basic Usage
 
 ```bash
-watchtower -script your-script.js
+quickdev -script your-script.js
 ```
 
 ### Advanced Usage
 
 ```bash
-watchtower -script server.js \
+quickdev -script server.js \
   --watch="src,config" \
   --ignore="node_modules,dist,coverage" \
   --ext=".ts,.js,.jsx,.tsx" \

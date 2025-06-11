@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"nehonix-nhr/internal/types"
+	"quickdev/internal/types"
 )
 
 // ProcessManager handles the running process
@@ -60,7 +60,7 @@ func (pm *ProcessManager) startProcess() error {
 	if runner == "ts-node" || runner == "tsx" {
 		// For TypeScript files, use npx to ensure we use the local installation
 		args := []string{"-y", runner}
-		
+
 		// Add configured flags if available
 		if pm.config.TSNodeFlags != "" {
 			flags := strings.Split(pm.config.TSNodeFlags, " ")
@@ -69,7 +69,7 @@ func (pm *ProcessManager) startProcess() error {
 			// Default ts-node flags if none configured
 			args = append(args, "--esm")
 		}
-		
+
 		// Add the script path
 		args = append(args, pm.scriptPath)
 		cmd = exec.Command("npx", args...)
@@ -108,7 +108,7 @@ func (pm *ProcessManager) determineRunner() string {
 		if pm.config.TypeScriptRunner != "" {
 			return pm.config.TypeScriptRunner
 		}
-		
+
 		// Check for local installations first using npx
 		if err := exec.Command("npx", "-y", "tsx", "--version").Run(); err == nil {
 			return "tsx"
@@ -116,7 +116,7 @@ func (pm *ProcessManager) determineRunner() string {
 		if err := exec.Command("npx", "-y", "ts-node", "--version").Run(); err == nil {
 			return "ts-node"
 		}
-		
+
 		// Fallback to checking global installations
 		if _, err := exec.LookPath("tsx"); err == nil {
 			return "tsx"
@@ -247,4 +247,4 @@ func (pm *ProcessManager) Stop() error {
 // GetRestartStats returns the current restart statistics
 func (pm *ProcessManager) GetRestartStats() *types.RestartStats {
 	return pm.restartStats
-} 
+}
