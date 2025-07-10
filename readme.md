@@ -79,40 +79,42 @@ Create a `quickdev.config.json` (or `.quickdevrc.json`) in your project root:
 
 ```json
 {
-  "script": "src/server.ts",
-  "watch": ["src", "config"],
-  "ignore": ["node_modules", "dist", "coverage"],
-  "extensions": [".ts", ".js", ".jsx", ".tsx"],
+    "script": "src/server.ts",
+    "watch": ["src", "config"],
+    "ignore": ["node_modules", "dist", "coverage"],
+    "extensions": [".ts", ".js", ".jsx", ".tsx"],
 
-  "gracefulShutdown": true,
-  "gracefulShutdownTimeout": 5,
-  "maxRestarts": 5,
-  "resetRestartsAfter": 60000,
-  "restartDelay": 100,
+    "gracefulShutdown": true,
+    "gracefulShutdownTimeout": 5,
+    "maxRestarts": 5,
+    "resetRestartsAfter": 60000,
+    "restartDelay": 100,
 
-  "batchChanges": true,
-  "batchTimeout": 300,
-  "enableHashing": true,
-  "usePolling": false,
-  "pollingInterval": 100,
-  "followSymlinks": false,
-  "watchDotFiles": false,
-  "ignoreFile": ".quickdevignore",
+    "batchChanges": true,
+    "batchTimeout": 300,
+    "enableHashing": true,
+    "usePolling": false,
+    "pollingInterval": 100,
+    "followSymlinks": false,
+    "watchDotFiles": false,
+    "ignoreFile": ".quickdevignore",
 
-  "parallelProcessing": true,
-  "memoryLimit": 500,
-  "maxFileSize": 10,
-  "excludeEmptyFiles": true,
-  "debounceMs": 250,
+    "parallelProcessing": true,
+    "memoryLimit": 500,
+    "maxFileSize": 10,
+    "excludeEmptyFiles": true,
+    "debounceMs": 250,
 
-  "healthCheck": true,
-  "healthCheckInterval": 30,
-  "clearScreen": true,
+    "healthCheck": true,
+    "healthCheckInterval": 30,
+    "clearScreen": true,
 
-  "typescriptRunner": "tsx",
-  "tsNodeFlags": "--esm"
+    "typescriptRunner": "bun",
+    "tsNodeFlags": "--esm"
 }
+
 ```
+Always use bun for better perfomance and fast ops (default: tsx). Install bun in your machine._
 
 ### Configuration Options
 
